@@ -11,14 +11,17 @@
 # include <sys/time.h>
 # include <sys/resource.h>
 # include <sys/socket.h>
+# include <pthread.h>
 #endif
+#include <iostream>
 #include <map>
 #include <vector>
 #include <string>
 
+#include <errno.h>
+
 #include <boost/version.hpp>
 #include <boost/thread.hpp>
-#include <boost/interprocess/sync/interprocess_recursive_mutex.hpp>
 #include <boost/date_time/gregorian/gregorian_types.hpp>
 #include <boost/date_time/posix_time/posix_time_types.hpp>
 
@@ -285,13 +288,54 @@ public:
     bool TryEnter() { return TryEnterCriticalSection(&cs); }
 #else
 protected:
-    boost::interprocess::interprocess_recursive_mutex mutex;
+    pthread_mutex_t mutex;
 public:
-    explicit CCriticalSection() { }
-    ~CCriticalSection() { }
-    void Enter() { mutex.lock(); }
-    void Leave() { mutex.unlock(); }
-    bool TryEnter() { return mutex.try_lock(); }
+    explicit CCriticalSection()
+    {
+	pthread_mutexattr_t attr;
+
+        if (pthread_mutexattr_init(&attr) != 0)
+	    std::cerr << "pthread_mutex_attr_init(): " << strerror(errno)
+                      << std::endl;
+
+	if (pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE) != 0)
+	    std::cerr << "pthread_mutexattr_settype(): " << strerror(errno)
+                      << std::endl;
+
+        if (pthread_mutex_init(&mutex, &attr) != 0)
+            std::cerr << "pthread_mutex_init(): " << strerror(errno)
+                      << std::endl;
+
+        if (pthread_mutexattr_destroy(&attr) != 0)
+	    std::cerr << "pthread_mutexattr_destroy(): " << strerror(errno)
+                      << std::endl;
+    }
+
+    ~CCriticalSection()
+    {
+        if (pthread_mutex_destroy(&mutex) != 0)
+            std::cerr << "pthread_mutex_destroy(): " << strerror(errno)
+                      << std::endl;
+    }
+
+    void Enter()
+    {
+        if (pthread_mutex_lock(&mutex) != 0)
+            std::cerr << "pthread_mutex_lock(): " << strerror(errno)
+                      << std::endl;
+    }
+
+    void Leave()
+    {
+        if (pthread_mutex_unlock(&mutex) != 0)
+            std::cerr << "pthread_mutex_unlock(): " << strerror(errno)
+                      << std::endl;
+    }
+
+    bool TryEnter()
+    {
+        return (pthread_mutex_trylock(&mutex) != 0);
+    }
 #endif
 public:
     const char* pszFile;

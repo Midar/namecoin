@@ -11,7 +11,6 @@
 #include <boost/filesystem.hpp>
 #include <boost/filesystem/fstream.hpp>
 #include <boost/interprocess/sync/interprocess_mutex.hpp>
-#include <boost/interprocess/sync/interprocess_recursive_mutex.hpp>
 #include <boost/foreach.hpp>
 
 using namespace std;
